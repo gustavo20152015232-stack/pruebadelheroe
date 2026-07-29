@@ -171,10 +171,9 @@ function vistaPedido(estado) {
       "<div class='producto-datos'>" +
       "<div class='producto-nombre'>" + esc(p.nombre) + "</div>" +
       "<div class='producto-precio'>" + pesos(p.precio) + "</div>" +
-      "<div class='producto-detalle" + (p.stock <= 0 ? " bajo" : (p.stock <= AVISO_STOCK_BAJO ? " bajo" : "")) + "'>" +
-      (p.stock <= 0 ? "Sin stock por ahora" : "Quedan " + p.stock) + "</div>" +
+      (p.stock <= 0 ? "<div class='producto-detalle bajo'>Sin stock por ahora</div>" : "") +
       "</div>" +
-      contadorHTML("p", p.id, cant, p.stock) +
+      contadorHTML("p", p.id, cant, p.stock <= 0) +
       "</div>";
   });
   html += "</div>";
@@ -188,10 +187,9 @@ function vistaPedido(estado) {
       "<div class='producto-nombre'>" + esc(c.nombre) + "</div>" +
       "<div class='producto-detalle'>" + esc(c.contenido) + "</div>" +
       "<div class='producto-precio'>" + pesos(c.precio) + "</div>" +
-      "<div class='producto-detalle" + (disp <= AVISO_STOCK_BAJO ? " bajo" : "") + "'>" +
-      (disp <= 0 ? "Sin stock por ahora" : "Se pueden armar " + disp) + "</div>" +
+      (disp <= 0 ? "<div class='producto-detalle bajo'>Sin stock por ahora</div>" : "") +
       "</div>" +
-      contadorHTML("c", c.id, cant, disp) +
+      contadorHTML("c", c.id, cant, disp <= 0) +
       "</div>";
   });
   html += "</div>";
@@ -249,23 +247,14 @@ function vistaPedido(estado) {
   return html;
 }
 
-function contadorHTML(tipo, id, cantidad, tope) {
+function contadorHTML(tipo, id, cantidad, agotado) {
   return "<div class='contador'>" +
     "<button data-accion='menos' data-tipo='" + tipo + "' data-id='" + id + "' aria-label='Quitar uno'" +
     (cantidad <= 0 ? " disabled" : "") + ">−</button>" +
     "<span class='cant'>" + cantidad + "</span>" +
     "<button data-accion='mas' data-tipo='" + tipo + "' data-id='" + id + "' aria-label='Agregar uno'" +
-    (cantidad >= tope ? " disabled" : "") + ">+</button>" +
+    (agotado ? " disabled" : "") + ">+</button>" +
     "</div>";
-}
-
-function topeDisponible(estado, tipo, id) {
-  if (tipo === "p") {
-    const p = producto(estado, id);
-    return p ? p.stock : 0;
-  }
-  const c = estado.combos.find(function (x) { return x.id === id; });
-  return c ? disponibilidadCombo(c, estado) : 0;
 }
 
 function campoTexto(campo, etiqueta, valor, ayuda, tipo) {
@@ -297,13 +286,6 @@ function confirmarPedidoCliente() {
   const estado = storageService.leer();
   const items = itemsDelBorrador(estado);
   if (!items.length) { mostrarAviso("El carrito está vacío.", "error"); return; }
-  const faltan = faltantesDeStock(items, estado);
-  if (faltan.length) {
-    mostrarAviso("Justo se agotó: " + faltan.map(function (f) { return f.nombre; }).join(", ") +
-      ". Ajustá las cantidades y probá de nuevo.", "error");
-    render();
-    return;
-  }
   if (!borrador.cliente.trim()) { mostrarAviso("Escribí tu nombre.", "error"); return; }
   if (!borrador.telefono.trim()) { mostrarAviso("Escribí tu teléfono.", "error"); return; }
   if (borrador.tipoEntrega === "delivery") {
@@ -339,46 +321,17 @@ function pedirUbicacion() {
     mostrarAviso("Este navegador no permite compartir la ubicación.", "error");
     return;
   }
-  if (!window.isSecureContext) {
-    mostrarAviso("La ubicación solo funciona con el sitio publicado (https) o en localhost, no abriendo el archivo directo.", "error");
-    return;
-  }
-
-  const guardarUbicacion = function (pos) {
+  mostrarAviso("Buscando tu ubicación...");
+  navigator.geolocation.getCurrentPosition(function (pos) {
     borrador.gps = {
       lat: Number(pos.coords.latitude.toFixed(6)),
       lng: Number(pos.coords.longitude.toFixed(6))
     };
     mostrarAviso("Ubicación guardada.", "ok");
     render();
-  };
-
-  mostrarAviso("Buscando tu ubicación...");
-  navigator.geolocation.getCurrentPosition(guardarUbicacion, function (err) {
-    /* La primera vuelta pide GPS de alta precisión; si eso falla, reintentamos
-       con precisión normal y más tiempo, que en interiores suele andar mejor. */
-    if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
-      mostrarAviso("Sigo buscando, puede tardar un poco más...");
-      navigator.geolocation.getCurrentPosition(guardarUbicacion, function (err2) {
-        mostrarAviso(mensajeErrorUbicacion(err2), "error");
-      }, { enableHighAccuracy: false, timeout: 20000 });
-      return;
-    }
-    mostrarAviso(mensajeErrorUbicacion(err), "error");
+  }, function () {
+    mostrarAviso("No se pudo obtener la ubicación. Escribí dirección y referencia.", "error");
   }, { enableHighAccuracy: true, timeout: 10000 });
-}
-
-function mensajeErrorUbicacion(err) {
-  if (err.code === err.PERMISSION_DENIED) {
-    return "Bloqueaste el permiso de ubicación para este sitio. Activalo desde el ícono de candado del navegador y probá de nuevo.";
-  }
-  if (err.code === err.POSITION_UNAVAILABLE) {
-    return "El teléfono no pudo calcular tu ubicación ahora. Probá salir a un lugar más abierto, o escribí dirección y referencia.";
-  }
-  if (err.code === err.TIMEOUT) {
-    return "Tardó demasiado en encontrar tu ubicación. Escribí dirección y referencia, o probá de nuevo.";
-  }
-  return "No se pudo obtener la ubicación. Escribí dirección y referencia.";
 }
 
 /* ---------------------------------------------------------
@@ -414,10 +367,7 @@ document.addEventListener("click", function (ev) {
 
   if (accion === "mas") {
     const clave = tipo + ":" + id;
-    const tope = topeDisponible(storageService.leer(), tipo, id);
-    const actual = borrador.items[clave] || 0;
-    if (actual >= tope) { mostrarAviso("No queda más stock de ese producto.", "error"); return; }
-    borrador.items[clave] = actual + 1;
+    borrador.items[clave] = (borrador.items[clave] || 0) + 1;
     render();
   } else if (accion === "menos") {
     const clave = tipo + ":" + id;
