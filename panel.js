@@ -12,6 +12,19 @@ let filtroVentas = { texto: "", periodo: "todo" };
 
 const TOPE_LISTA = 15; // cuántas tarjetas viejas se muestran sin buscar
 
+/* ---------- Secciones plegables (para no amontonar tarjetas) ---------- */
+
+let gruposAbiertos = {};
+
+function grupoColapsable(clave, titulo, cuenta, contenidoHTML, abiertoPorDefecto) {
+  if (!(clave in gruposAbiertos)) gruposAbiertos[clave] = !!abiertoPorDefecto;
+  return "<details class='grupo-colapsable' data-grupo='" + clave + "'" +
+    (gruposAbiertos[clave] ? " open" : "") + ">" +
+    "<summary class='grupo-titulo'>" + esc(titulo) + "<span class='cuenta'>" + cuenta + "</span></summary>" +
+    "<div class='grupo-cuerpo'>" + contenidoHTML + "</div>" +
+    "</details>";
+}
+
 /* Compara sin distinguir mayúsculas ni acentos: "gomez" encuentra "Gómez". */
 function normalizar(txt) {
   return String(txt == null ? "" : txt).toLowerCase()
@@ -92,17 +105,20 @@ function vistaVentas(estado) {
 
   grupos.forEach(function (g) {
     const lista = filtrados.filter(function (p) { return p.estado === g.clave; });
-    html += "<div class='grupo-titulo'>" + g.titulo + "<span class='cuenta'>" + lista.length + "</span></div>";
+    let contenido = "";
     if (!lista.length) {
-      html += "<div class='vacio'>Sin pedidos en este estado.</div>";
-      return;
+      contenido = "<div class='vacio'>Sin pedidos en este estado.</div>";
+    } else {
+      const visibles = g.tope ? lista.slice(0, g.tope) : lista;
+      visibles.forEach(function (p) { contenido += tarjetaPedido(p, estado); });
+      if (lista.length > visibles.length) {
+        contenido += "<div class='vacio'>Se muestran " + visibles.length + " de " + lista.length +
+          ". Usá el buscador de arriba para encontrar las anteriores.</div>";
+      }
     }
-    const visibles = g.tope ? lista.slice(0, g.tope) : lista;
-    visibles.forEach(function (p) { html += tarjetaPedido(p, estado); });
-    if (lista.length > visibles.length) {
-      html += "<div class='vacio'>Se muestran " + visibles.length + " de " + lista.length +
-        ". Usá el buscador de arriba para encontrar las anteriores.</div>";
-    }
+    /* Nuevos y Confirmados arrancan abiertos porque son los que requieren acción hoy. */
+    const abierto = g.clave === "nuevo" || g.clave === "confirmado";
+    html += grupoColapsable("ventas-" + g.clave, g.titulo, lista.length, contenido, abierto);
   });
 
   return html;
@@ -500,20 +516,20 @@ function vistaEnvios(estado) {
     ? sinSalidaHoy
     : sinSalidaHoy.filter(function (p) { return (p.zona || "Sin zona") === filtroZona; });
 
-  html += "<div class='grupo-titulo'>Pedidos de hoy sin salida<span class='cuenta'>" + sinSalidaHoy.length + "</span></div>";
+  let contenidoSinSalida = "";
   if (!sinSalidaHoy.length) {
-    html += "<div class='vacio'>No hay pedidos esperando salida.</div>";
+    contenidoSinSalida = "<div class='vacio'>No hay pedidos esperando salida.</div>";
   } else {
-    html += "<div class='tarjeta'>";
+    contenidoSinSalida += "<div class='tarjeta'>";
     if (zonasPresentes.length > 1) {
-      html += "<div class='campo'><label for='filtro-zona'>Ver zona</label>" +
+      contenidoSinSalida += "<div class='campo'><label for='filtro-zona'>Ver zona</label>" +
         "<select id='filtro-zona' data-filtro-zona='1'>" + opcion("todas", "Todas las zonas", filtroZona);
-      zonasPresentes.forEach(function (z) { html += opcion(z, z, filtroZona); });
-      html += "</select></div>";
+      zonasPresentes.forEach(function (z) { contenidoSinSalida += opcion(z, z, filtroZona); });
+      contenidoSinSalida += "</select></div>";
     }
     visiblesEnvios.forEach(function (p) {
       const marcado = seleccionEnvios.indexOf(p.id) >= 0;
-      html += "<div class='producto'><div class='producto-datos'>" +
+      contenidoSinSalida += "<div class='producto'><div class='producto-datos'>" +
         "<div class='producto-nombre'>" + esc(p.numero) + " · " + esc(p.cliente) + "</div>" +
         "<div class='producto-detalle'>" + esc(p.direccion || "sin dirección") + " — " + esc(p.referencia || "sin referencia") + "</div>" +
         "<div class='producto-detalle'>" + (p.zona ? "<strong>" + esc(p.zona) + "</strong> · " : "") +
@@ -523,46 +539,50 @@ function vistaEnvios(estado) {
         "<button class='btn btn-chico " + (marcado ? "btn-principal" : "btn-suave") +
         "' data-accion='sel-envio' data-id='" + p.id + "'>" + (marcado ? "Elegido" : "Elegir") + "</button></div>";
     });
-    html += "<div class='fila-entre' style='margin-top:12px'>" +
+    contenidoSinSalida += "<div class='fila-entre' style='margin-top:12px'>" +
       "<span class='ayuda'>Elegidos: " + seleccionEnvios.length + " de " + MAX_PEDIDOS_SALIDA + "</span>" +
       "<button class='btn btn-principal' data-accion='crear-salida'" +
       (seleccionEnvios.length ? "" : " disabled") + ">Crear salida</button></div>";
-    html += "</div>";
+    contenidoSinSalida += "</div>";
   }
+  html += grupoColapsable("envios-sin-salida", "Pedidos de hoy sin salida", sinSalidaHoy.length, contenidoSinSalida, true);
 
-  html += "<div class='grupo-titulo'>Salidas del día<span class='cuenta'>" + salidasActivas.length + "</span></div>";
+  let contenidoSalidas = "";
   if (!salidasActivas.length) {
-    html += "<div class='vacio'>Todavía no armaste ninguna salida.</div>";
+    contenidoSalidas = "<div class='vacio'>Todavía no armaste ninguna salida.</div>";
   } else {
-    salidasActivas.forEach(function (s) { html += tarjetaSalida(s, estado, false); });
+    salidasActivas.forEach(function (s) { contenidoSalidas += tarjetaSalida(s, estado, false); });
   }
+  html += grupoColapsable("envios-salidas", "Salidas del día", salidasActivas.length, contenidoSalidas, true);
 
   if (salidasViejas.length) {
-    html += "<div class='grupo-titulo'>Sin cerrar de días anteriores<span class='cuenta'>" + salidasViejas.length + "</span></div>";
-    html += "<div class='aviso-suave'>Estas salidas quedaron abiertas. Cerralas para que no se mezclen con las de hoy.</div>";
-    salidasViejas.forEach(function (s) { html += tarjetaSalida(s, estado, false); });
+    let contenidoViejas = "<div class='aviso-suave'>Estas salidas quedaron abiertas. Cerralas para que no se mezclen con las de hoy.</div>";
+    salidasViejas.forEach(function (s) { contenidoViejas += tarjetaSalida(s, estado, false); });
+    html += grupoColapsable("envios-viejas", "Sin cerrar de días anteriores", salidasViejas.length, contenidoViejas, true);
   }
 
-  html += "<div class='grupo-titulo'>Próximo reparto<span class='cuenta'>" + proximas.length + "</span></div>";
+  let contenidoProximas = "";
   if (!proximas.length) {
-    html += "<div class='vacio'>Sin pedidos para días siguientes.</div>";
+    contenidoProximas = "<div class='vacio'>Sin pedidos para días siguientes.</div>";
   } else {
-    html += "<div class='tarjeta'>";
+    contenidoProximas = "<div class='tarjeta'>";
     proximas.forEach(function (p) {
-      html += "<div class='producto'><div class='producto-datos'>" +
+      contenidoProximas += "<div class='producto'><div class='producto-datos'>" +
         "<div class='producto-nombre'>" + esc(p.numero) + " · " + esc(p.cliente) + "</div>" +
         "<div class='producto-detalle'>" + fechaLarga(p.fechaEntrega) + " — " + esc(p.direccion || "sin dirección") + "</div>" +
         "</div></div>";
     });
-    html += "</div>";
+    contenidoProximas += "</div>";
   }
+  html += grupoColapsable("envios-proximas", "Próximo reparto", proximas.length, contenidoProximas, false);
 
-  html += "<div class='grupo-titulo'>Entregas finalizadas<span class='cuenta'>" + salidasCerradas.length + "</span></div>";
+  let contenidoCerradas = "";
   if (!salidasCerradas.length) {
-    html += "<div class='vacio'>Sin salidas finalizadas.</div>";
+    contenidoCerradas = "<div class='vacio'>Sin salidas finalizadas.</div>";
   } else {
-    salidasCerradas.forEach(function (s) { html += tarjetaSalida(s, estado, true); });
+    salidasCerradas.forEach(function (s) { contenidoCerradas += tarjetaSalida(s, estado, true); });
   }
+  html += grupoColapsable("envios-cerradas", "Entregas finalizadas", salidasCerradas.length, contenidoCerradas, false);
 
   return html;
 }
@@ -587,30 +607,36 @@ function tarjetaSalida(s, estado, cerrada) {
       esc(p.direccion || "sin dirección") + " — " + esc(p.referencia || "sin referencia") + "</div>";
     html += "<div class='dato'>" + pesos(p.total) + " · " + (p.pago === "efectivo" ? "Efectivo" : "Transferencia") +
       (p.cobrado ? " · <strong>cobrado</strong>" : "") + "</div>";
-    html += "<div class='acciones'>";
+    let accionesPrincipales = "";
+    let accionesExtra = "";
     if (p.gps) {
-      html += "<a class='btn btn-chico btn-suave' target='_blank' rel='noopener' href='" +
+      accionesPrincipales += "<a class='btn btn-chico btn-suave' target='_blank' rel='noopener' href='" +
         esc(enlaceMapa(p.gps)) + "'>Ver en el mapa</a>";
     }
     if (s.estado === "preparacion") {
-      html += "<button class='btn btn-chico btn-suave' data-accion='subir' data-salida='" + s.id + "' data-id='" + p.id + "'>Subir</button>";
-      html += "<button class='btn btn-chico btn-suave' data-accion='bajar' data-salida='" + s.id + "' data-id='" + p.id + "'>Bajar</button>";
-      html += "<button class='btn btn-chico btn-suave' data-accion='quitar-salida' data-salida='" + s.id + "' data-id='" + p.id + "'>Quitar</button>";
+      accionesPrincipales += "<button class='btn btn-chico btn-suave' data-accion='subir' data-salida='" + s.id + "' data-id='" + p.id + "'>Subir</button>";
+      accionesPrincipales += "<button class='btn btn-chico btn-suave' data-accion='bajar' data-salida='" + s.id + "' data-id='" + p.id + "'>Bajar</button>";
+      accionesExtra += "<button class='btn btn-chico btn-suave' data-accion='quitar-salida' data-salida='" + s.id + "' data-id='" + p.id + "'>Quitar</button>";
     }
     if (s.estado === "en_reparto" && p.estadoEnvio !== "entregado") {
       if (p.pago === "efectivo" && !p.cobrado) {
-        html += "<button class='btn btn-chico btn-principal' data-accion='entregado-cobrado' data-id='" + p.id + "'>Entregado y cobrado</button>";
+        accionesPrincipales += "<button class='btn btn-chico btn-principal' data-accion='entregado-cobrado' data-id='" + p.id + "'>Entregado y cobrado</button>";
       }
-      html += "<button class='btn btn-chico btn-principal' data-accion='entregado' data-id='" + p.id + "'>Entregado</button>";
-      html += "<button class='btn btn-chico btn-suave' data-accion='no-entregado' data-id='" + p.id + "'>No entregado</button>";
+      accionesPrincipales += "<button class='btn btn-chico btn-principal' data-accion='entregado' data-id='" + p.id + "'>Entregado</button>";
+      accionesExtra += "<button class='btn btn-chico btn-suave' data-accion='no-entregado' data-id='" + p.id + "'>No entregado</button>";
       if (p.telefono) {
-        html += "<a class='btn btn-chico btn-suave' target='_blank' rel='noopener' href='" +
+        accionesExtra += "<a class='btn btn-chico btn-suave' target='_blank' rel='noopener' href='" +
           esc(enlaceWhatsapp(p.telefono, "Hola " + p.cliente + "! Tu pedido " + p.numero +
             " ya salió y está en camino 🛵🍦. En un rato llega.")) +
           "'>Avisar que está en camino</a>";
       }
     }
-    html += "</div></div>";
+    html += "<div class='acciones'>" + accionesPrincipales + "</div>";
+    if (accionesExtra) {
+      html += "<details class='mas-opciones'><summary>Más opciones</summary>" +
+        "<div class='acciones'>" + accionesExtra + "</div></details>";
+    }
+    html += "</div>";
   });
 
   const aCobrar = pedidos.reduce(function (suma, p) {
@@ -795,24 +821,23 @@ function seccionMovimientos(estado) {
     ? todos
     : todos.filter(function (m) { return m.productoId === filtroMovimientos; });
 
-  let html = "<div class='tarjeta'><h2>Historial de movimientos</h2>" +
-    "<p class='ayuda'>Queda registrado cada cambio de stock y por qué se hizo.</p>";
+  let contenido = "<div class='tarjeta'><p class='ayuda'>Queda registrado cada cambio de stock y por qué se hizo.</p>";
 
-  html += "<div class='campo'><label for='filtro-mov'>Producto</label>" +
+  contenido += "<div class='campo'><label for='filtro-mov'>Producto</label>" +
     "<select id='filtro-mov' data-filtro-mov='1'>" + opcion("todos", "Todos los productos", filtroMovimientos);
   estado.productos.forEach(function (p) {
-    html += opcion(p.id, p.nombre, filtroMovimientos);
+    contenido += opcion(p.id, p.nombre, filtroMovimientos);
   });
-  html += "</select></div>";
+  contenido += "</select></div>";
 
   if (!lista.length) {
-    html += "<div class='vacio'>Todavía no hay movimientos registrados.</div></div>";
-    return html;
+    contenido += "<div class='vacio'>Todavía no hay movimientos registrados.</div></div>";
+    return grupoColapsable("stock-movimientos", "Historial de movimientos", lista.length, contenido, false);
   }
 
   lista.slice(0, TOPE_MOVIMIENTOS).forEach(function (m) {
     const entra = m.delta > 0;
-    html += "<div class='mov-stock'>" +
+    contenido += "<div class='mov-stock'>" +
       "<span class='mov-delta " + (entra ? "entra" : "sale") + "'>" +
       (entra ? "+" : "") + m.delta + "</span>" +
       "<span class='mov-datos'><strong>" + esc(m.nombre) + "</strong>" +
@@ -824,11 +849,11 @@ function seccionMovimientos(estado) {
   });
 
   if (lista.length > TOPE_MOVIMIENTOS) {
-    html += "<div class='vacio'>Se muestran los últimos " + TOPE_MOVIMIENTOS + " de " + lista.length +
+    contenido += "<div class='vacio'>Se muestran los últimos " + TOPE_MOVIMIENTOS + " de " + lista.length +
       ". Filtrá por producto para ver los demás.</div>";
   }
-  html += "</div>";
-  return html;
+  contenido += "</div>";
+  return grupoColapsable("stock-movimientos", "Historial de movimientos", lista.length, contenido, false);
 }
 
 function abrirMovimiento(productoId) {
@@ -1188,6 +1213,14 @@ function render() {
 /* ---------------------------------------------------------
    EVENTOS
    --------------------------------------------------------- */
+
+/* El evento "toggle" de <details> no burbujea: hay que escucharlo en captura. */
+document.addEventListener("toggle", function (ev) {
+  const det = ev.target;
+  if (det.tagName === "DETAILS" && det.dataset.grupo) {
+    gruposAbiertos[det.dataset.grupo] = det.open;
+  }
+}, true);
 
 document.addEventListener("click", function (ev) {
   const nodo = ev.target.closest("[data-accion]");

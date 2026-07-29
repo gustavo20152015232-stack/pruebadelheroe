@@ -214,6 +214,16 @@ textarea{min-height:70px;resize:vertical;}
 .dia-caja summary::-webkit-details-marker{display:none;}
 .dia-caja[open] summary{margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--linea);}
 
+.grupo-colapsable{margin:18px 0 8px;}
+.grupo-colapsable summary{
+  cursor:pointer;list-style:none;
+  display:flex;align-items:center;gap:6px;
+}
+.grupo-colapsable summary::-webkit-details-marker{display:none;}
+.grupo-colapsable summary::before{content:"▸";color:var(--gris);font-size:.85em;}
+.grupo-colapsable[open] summary::before{content:"▾";}
+.grupo-colapsable .grupo-cuerpo{margin-top:6px;}
+
 .mas-opciones{margin-top:6px;}
 .mas-opciones summary{
   cursor:pointer;font-size:.85rem;color:var(--noche-suave);
@@ -371,3 +381,32 @@ textarea{min-height:70px;resize:vertical;}
 .chapa-conexion.sin-conexion{background:var(--frutilla);color:#fff;}
 .chapa-conexion.local{background:var(--hielo-hondo);color:var(--noche);}
 .barra-top{flex-wrap:wrap;}
+
+/* ---------------------------------------------------------
+   Escritorio: los tamaños de arriba están pensados para el
+   dedo en el celular. Con mouse no hace falta que todo sea
+   tan grande, y sobra ancho de pantalla para aprovechar.
+   --------------------------------------------------------- */
+@media(min-width:640px){
+  body{font-size:15px;}
+
+  .btn{padding:10px 16px;min-height:40px;}
+  .btn-chico{padding:7px 12px;min-height:34px;font-size:.82rem;}
+
+  .contador button{width:34px;height:34px;font-size:1.1rem;border-radius:10px;}
+  .contador .cant{min-width:24px;font-size:.95rem;}
+
+  .tarjeta{padding:12px 14px;}
+  .producto{padding:8px 0;}
+
+  input,select,textarea{padding:9px 10px;}
+
+  /* Productos y combos en dos columnas: el título ocupa las dos. */
+  .tarjeta:has(> .producto){
+    display:grid;grid-template-columns:1fr 1fr;
+    column-gap:20px;align-content:start;
+  }
+  .tarjeta:has(> .producto) > h2,
+  .tarjeta:has(> .producto) > p{grid-column:1 / -1;}
+  .tarjeta:has(> .producto) > .producto{border-bottom:1px solid var(--gris-clara);}
+}

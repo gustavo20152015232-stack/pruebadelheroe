@@ -506,8 +506,17 @@ function iniciarModal() {
     if (!modalAceptar) { cerrarModal(); return; }
     if (modalAceptar() !== false) cerrarModal();
   });
+  /* Cierra solo si el clic empezó Y terminó en el fondo oscuro. Algunos
+     celulares, al elegir una opción de un <select>, disparan un "click"
+     que el navegador reporta sobre el fondo en vez del <select> — sin este
+     chequeo doble, eso cerraba el modal solo mientras se elegía el motivo
+     de un movimiento de stock. */
+  let mousedownEnFondo = false;
+  modal.addEventListener("mousedown", function (ev) {
+    mousedownEnFondo = ev.target.id === "modal";
+  });
   modal.addEventListener("click", function (ev) {
-    if (ev.target.id === "modal") cerrarModal();
+    if (ev.target.id === "modal" && mousedownEnFondo) cerrarModal();
   });
   document.addEventListener("keydown", function (ev) {
     if (ev.key === "Escape") cerrarModal();
