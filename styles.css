@@ -1,0 +1,356 @@
+/* =========================================================
+   Heladería y Congelados — estilos de la demo local
+   Paleta: hielo, crema, menta, frutilla, dulce de leche
+   ========================================================= */
+
+:root{
+  --hielo:#eaf2f7;
+  --hielo-hondo:#d6e6ef;
+  --noche:#12303f;
+  --noche-suave:#3d5f70;
+  --crema:#fffaf3;
+  --blanco:#ffffff;
+  --menta:#1f9e8c;
+  --menta-clara:#d8f0eb;
+  --frutilla:#d8465f;
+  --frutilla-clara:#fbe0e4;
+  --dulce:#e08c34;
+  --dulce-clara:#fceedc;
+  --gris:#7d8f99;
+  --gris-clara:#e7edf1;
+  --linea:#c9dbe5;
+  --radio:14px;
+  --sombra:0 2px 0 var(--hielo-hondo), 0 6px 18px rgba(18,48,63,.08);
+  --fuente:"Trebuchet MS", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+*{box-sizing:border-box;}
+
+html,body{margin:0;padding:0;}
+
+body{
+  font-family:var(--fuente);
+  background:var(--hielo);
+  color:var(--noche);
+  font-size:17px;
+  line-height:1.45;
+  -webkit-text-size-adjust:100%;
+}
+
+h1,h2,h3,h4{margin:0 0 .4em;line-height:1.15;letter-spacing:-.01em;}
+h1{font-size:1.5rem;}
+h2{font-size:1.25rem;}
+h3{font-size:1.05rem;}
+p{margin:0 0 .6em;}
+
+/* ---------- Barra superior ---------- */
+.barra{
+  position:sticky;top:0;z-index:40;
+  background:var(--noche);
+  color:var(--crema);
+  box-shadow:0 4px 14px rgba(18,48,63,.18);
+}
+.barra-top{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:10px 14px 8px;
+}
+.marca{display:flex;align-items:center;gap:8px;font-weight:bold;font-size:1.05rem;}
+.marca-icono{color:#9fe3d8;font-size:1.2rem;}
+.etiqueta-demo{
+  background:var(--dulce);color:#3b2408;
+  font-size:.62rem;font-weight:bold;letter-spacing:.09em;
+  padding:4px 8px;border-radius:999px;white-space:nowrap;
+}
+.nav{display:flex;overflow-x:auto;gap:4px;padding:0 8px 8px;}
+.nav a{
+  flex:1 0 auto;text-align:center;
+  color:#cfe4ee;text-decoration:none;
+  padding:9px 14px;border-radius:999px;
+  font-size:.92rem;white-space:nowrap;
+}
+.nav a:hover{background:rgba(255,255,255,.08);}
+.nav a.activo{background:var(--menta);color:#fff;font-weight:bold;}
+
+/* ---------- Estructura ---------- */
+.app{max-width:960px;margin:0 auto;padding:14px 12px 90px;}
+
+.tarjeta{
+  background:var(--blanco);
+  border:1px solid var(--linea);
+  border-radius:var(--radio);
+  padding:14px;
+  margin-bottom:12px;
+  box-shadow:var(--sombra);
+}
+.tarjeta.plana{box-shadow:none;}
+
+.encabezado-vista{margin-bottom:12px;}
+.encabezado-vista p{color:var(--noche-suave);font-size:.92rem;margin:0;}
+
+.aviso-suave{
+  background:var(--dulce-clara);
+  border:1px solid #f0d3a8;
+  border-radius:var(--radio);
+  padding:10px 12px;
+  font-size:.88rem;
+  margin-bottom:12px;
+  color:#6a4611;
+}
+
+.fila{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.fila-entre{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;}
+.grilla{display:grid;gap:10px;}
+@media(min-width:700px){
+  .grilla-2{grid-template-columns:1fr 1fr;}
+  .grilla-3{grid-template-columns:repeat(3,1fr);}
+}
+
+.sep{height:1px;background:var(--linea);margin:12px 0;border:0;}
+
+/* ---------- Botones ---------- */
+.btn{
+  font-family:inherit;font-size:1rem;font-weight:bold;
+  border:1px solid var(--noche);
+  background:var(--noche);color:#fff;
+  padding:12px 16px;border-radius:12px;
+  cursor:pointer;min-height:46px;
+}
+.btn:hover{filter:brightness(1.08);}
+.btn:active{transform:translateY(1px);}
+.btn:focus-visible{outline:3px solid var(--dulce);outline-offset:2px;}
+.btn-principal{background:var(--menta);border-color:var(--menta);}
+.btn-suave{background:var(--blanco);color:var(--noche);border-color:var(--linea);}
+.btn-peligro{background:var(--frutilla);border-color:var(--frutilla);}
+.btn-chico{font-size:.85rem;padding:8px 12px;min-height:38px;border-radius:10px;}
+.btn-ancho{width:100%;}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+
+/* ---------- Formularios ---------- */
+label{display:block;font-weight:bold;font-size:.88rem;margin-bottom:4px;}
+input,select,textarea{
+  font-family:inherit;font-size:1rem;
+  width:100%;padding:11px 12px;
+  border:1px solid var(--linea);border-radius:12px;
+  background:var(--blanco);color:var(--noche);
+}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--menta);outline-offset:1px;}
+textarea{min-height:70px;resize:vertical;}
+.campo{margin-bottom:10px;}
+.ayuda{font-size:.8rem;color:var(--gris);font-weight:normal;}
+.opciones{display:flex;gap:8px;}
+.opciones label{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
+  border:1px solid var(--linea);border-radius:12px;padding:11px 8px;
+  background:var(--blanco);cursor:pointer;font-size:.95rem;margin:0;
+}
+.opciones label:has(input:checked){border-color:var(--menta);background:var(--menta-clara);}
+.opciones input{width:auto;}
+
+/* ---------- Productos y carrito ---------- */
+.producto{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 0;border-bottom:1px solid var(--gris-clara);
+}
+.producto:last-child{border-bottom:0;}
+.producto-datos{flex:1;min-width:0;}
+.producto-nombre{font-weight:bold;}
+.producto-detalle{font-size:.78rem;color:var(--gris);}
+.producto-precio{font-size:.95rem;color:var(--menta);font-weight:bold;}
+.contador{display:flex;align-items:center;gap:6px;}
+.contador button{
+  width:44px;height:44px;border-radius:12px;
+  border:1px solid var(--linea);background:var(--hielo);
+  font-size:1.3rem;font-weight:bold;color:var(--noche);cursor:pointer;
+}
+.contador button:disabled{opacity:.35;cursor:not-allowed;}
+.contador .cant{min-width:30px;text-align:center;font-weight:bold;font-size:1.05rem;}
+
+.carrito-linea{display:flex;justify-content:space-between;gap:8px;font-size:.92rem;padding:3px 0;}
+.total{
+  display:flex;justify-content:space-between;align-items:baseline;
+  font-size:1.3rem;font-weight:bold;margin-top:8px;
+  padding-top:8px;border-top:2px solid var(--noche);
+}
+
+.barra-total{
+  position:fixed;left:0;right:0;bottom:0;z-index:35;
+  background:var(--noche);color:#fff;
+  padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;
+  box-shadow:0 -4px 14px rgba(18,48,63,.2);
+}
+.barra-total .btn{padding:10px 16px;min-height:42px;}
+
+/* ---------- Estados ---------- */
+.pill{
+  display:inline-block;font-size:.72rem;font-weight:bold;
+  padding:3px 9px;border-radius:999px;letter-spacing:.03em;
+  border:1px solid transparent;
+}
+.pill-nuevo{background:var(--dulce-clara);color:#8a5410;border-color:#eec78d;}
+.pill-confirmado{background:var(--menta-clara);color:#0f6155;border-color:#a9ddd4;}
+.pill-rechazado,.pill-cancelado{background:var(--frutilla-clara);color:#8e2136;border-color:#f0b7c1;}
+.pill-finalizado{background:var(--gris-clara);color:#4b5b64;border-color:#cdd8de;}
+.pill-info{background:var(--hielo);color:var(--noche-suave);border-color:var(--linea);}
+
+/* ---------- Pedidos ---------- */
+.pedido{border-left:6px solid var(--gris-clara);}
+.pedido.e-nuevo{border-left-color:var(--dulce);}
+.pedido.e-confirmado{border-left-color:var(--menta);}
+.pedido.e-rechazado,.pedido.e-cancelado{border-left-color:var(--frutilla);}
+.pedido.e-finalizado{border-left-color:var(--gris);}
+.pedido-cabecera{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;}
+.pedido-numero{font-weight:bold;font-size:1.05rem;}
+.pedido-meta{font-size:.82rem;color:var(--gris);}
+.pedido-items{font-size:.9rem;margin:8px 0;padding-left:18px;}
+.pedido-items li{margin-bottom:2px;}
+.dato{font-size:.88rem;margin:2px 0;}
+.dato strong{font-weight:bold;}
+.acciones{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+
+.mas-opciones{margin-top:6px;}
+.mas-opciones summary{
+  cursor:pointer;font-size:.85rem;color:var(--noche-suave);
+  font-weight:bold;padding:4px 0;list-style:none;
+}
+.mas-opciones summary::-webkit-details-marker{display:none;}
+.mas-opciones summary::before{content:"⋯ ";}
+.mas-opciones[open] summary::before{content:"▾ ";}
+.mas-opciones .acciones{margin-top:8px;}
+
+.vacio{
+  text-align:center;color:var(--gris);
+  padding:22px 12px;font-size:.92rem;
+  border:1px dashed var(--linea);border-radius:var(--radio);
+  background:var(--blanco);
+}
+
+.grupo-titulo{
+  display:flex;align-items:center;gap:8px;
+  margin:18px 0 8px;font-size:1.05rem;font-weight:bold;
+}
+.grupo-titulo .cuenta{
+  background:var(--noche);color:#fff;font-size:.75rem;
+  padding:2px 9px;border-radius:999px;
+}
+
+/* ---------- Stock ---------- */
+.stock-fila{
+  display:grid;grid-template-columns:1fr auto;gap:8px 12px;
+  padding:12px 0;border-bottom:1px solid var(--gris-clara);align-items:center;
+}
+.stock-fila:last-child{border-bottom:0;}
+.stock-precio{display:flex;align-items:center;gap:6px;margin-top:6px;}
+.stock-precio input{max-width:130px;}
+.bajo{color:var(--frutilla);font-weight:bold;}
+
+/* ---------- Caja ---------- */
+.resumen{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;}
+.resumen div{background:var(--hielo);border-radius:12px;padding:10px 6px;}
+.resumen .cifra{font-size:1.1rem;font-weight:bold;display:block;}
+.resumen .rotulo{font-size:.72rem;color:var(--noche-suave);text-transform:uppercase;letter-spacing:.05em;}
+.mov{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--gris-clara);font-size:.9rem;}
+.mov:last-child{border-bottom:0;}
+.mov.anulacion{color:var(--frutilla);}
+
+/* ---------- Avisos ---------- */
+.avisos{position:fixed;left:10px;right:10px;bottom:74px;z-index:60;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
+.aviso{
+  background:var(--noche);color:#fff;
+  padding:12px 14px;border-radius:12px;font-size:.92rem;
+  box-shadow:0 6px 20px rgba(18,48,63,.28);
+}
+.aviso.ok{background:var(--menta);}
+.aviso.error{background:var(--frutilla);}
+
+/* ---------- Modal ---------- */
+.modal{position:fixed;inset:0;z-index:80;background:rgba(18,48,63,.55);display:flex;align-items:center;justify-content:center;padding:16px;}
+.modal.oculto{display:none;}
+.modal-caja{background:var(--blanco);border-radius:var(--radio);padding:18px;max-width:520px;width:100%;max-height:88vh;overflow:auto;}
+.modal-acciones{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
+.modal-acciones .btn{flex:1;}
+
+/* ---------- Comanda / impresión ---------- */
+.area-impresion{display:none;}
+.comanda{font-family:var(--fuente);color:#000;}
+.comanda h2{margin:0 0 4px;}
+.comanda .linea{border-top:1px dashed #000;margin:8px 0;}
+.comanda table{width:100%;border-collapse:collapse;font-size:14px;}
+.comanda td{padding:3px 0;vertical-align:top;}
+.comanda td.cant{width:46px;}
+.comanda td.imp{text-align:right;white-space:nowrap;}
+.comanda .total-c{font-weight:bold;font-size:17px;border-top:1px solid #000;padding-top:6px;}
+
+@media print{
+  .no-print,.barra,.avisos,.modal,.barra-total{display:none !important;}
+  body{background:#fff;font-size:13px;}
+  .app{display:none;}
+  .area-impresion{display:block;padding:0;}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *{transition:none !important;animation:none !important;}
+}
+
+/* ---------- Separación entre página pública y panel interno ---------- */
+
+/* La barra pública no tiene navegación: el cliente solo ve su pedido. */
+.barra-publica .barra-top{padding-bottom:12px;}
+
+/* El panel interno se distingue a simple vista del sitio del cliente. */
+.interno .barra{background:#0b2029;border-bottom:3px solid var(--dulce);}
+.interno .etiqueta-demo{background:var(--frutilla);color:#fff;}
+
+.nav-externo{
+  color:#9fe3d8;border:1px dashed rgba(159,227,216,.5);
+  font-size:.78rem;text-decoration:none;white-space:nowrap;
+  padding:4px 10px;border-radius:999px;
+}
+.nav-externo:hover{background:rgba(159,227,216,.12);}
+
+/* Paradas dentro de una salida de reparto */
+.parada{border-top:1px solid var(--gris-clara);padding-top:8px;margin-top:8px;}
+.pie-salida{border-top:1px solid var(--gris-clara);padding-top:10px;margin-top:10px;}
+
+/* ---------- Buscador de ventas ---------- */
+.buscador{background:var(--crema);border-color:#e8dcc9;}
+.buscador .campo:last-child{margin-bottom:0;}
+
+/* ---------- Historial de movimientos de stock ---------- */
+.mov-stock{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 0;border-bottom:1px solid var(--gris-clara);
+}
+.mov-stock:last-child{border-bottom:0;}
+.mov-datos{flex:1;min-width:0;font-size:.9rem;}
+.mov-delta{
+  min-width:44px;text-align:center;font-weight:bold;font-size:.95rem;
+  padding:5px 6px;border-radius:10px;
+}
+.mov-delta.entra{background:var(--menta-clara);color:#0f6155;}
+.mov-delta.sale{background:var(--frutilla-clara);color:#8e2136;}
+.mov-queda{font-size:.78rem;color:var(--gris);white-space:nowrap;}
+
+/* ---------- Hoja de ruta impresa ---------- */
+.parada-print{
+  border-bottom:1px dashed #000;
+  padding:8px 0;font-size:13px;line-height:1.4;
+}
+.parada-print:last-child{border-bottom:0;}
+.parada-titulo{font-weight:bold;font-size:15px;}
+.firma{margin-top:6px;font-size:12px;}
+
+/* ---------- Cliente que vuelve ---------- */
+.bienvenida{background:var(--menta-clara);border-color:#a9ddd4;}
+.bienvenida h2{margin-bottom:2px;}
+
+/* ---------- Chapa de estado de conexión ---------- */
+.chapa-conexion{
+  font-size:.62rem;font-weight:bold;letter-spacing:.06em;
+  padding:4px 8px;border-radius:999px;white-space:nowrap;
+  text-transform:uppercase;
+}
+.chapa-conexion.conectando{background:var(--gris-clara);color:#4b5b64;}
+.chapa-conexion.en-linea{background:var(--menta);color:#fff;}
+.chapa-conexion.sin-conexion{background:var(--frutilla);color:#fff;}
+.chapa-conexion.local{background:var(--hielo-hondo);color:var(--noche);}
+.barra-top{flex-wrap:wrap;}
