@@ -100,6 +100,7 @@ function reiniciarBorrador() {
     items: {}, cliente: "", telefono: "", tipoEntrega: "delivery", pago: "efectivo",
     observaciones: "", direccion: "", referencia: "", zona: "", gps: null, ultimoPedidoId: null
   };
+  autoUbicacionIntentada = false;
 }
 
 function itemsDelBorrador(estado) {
@@ -221,27 +222,32 @@ function vistaPedido(estado) {
     "</div></div>";
 
   if (borrador.tipoEntrega === "delivery") {
+    const tieneDatosEscritos = borrador.direccion.trim() || borrador.referencia.trim();
+
     html += "<hr class='sep'><h3>¿Dónde te llevamos el pedido?</h3>" +
-      "<div class='campo'><label>Marcá tu casa en el mapa</label>" +
+      "<div class='campo'>" +
       "<div id='mapa-ubicacion'></div>" +
       "<div class='fila'>" +
       "<button type='button' class='btn btn-suave btn-chico' data-accion='centrar-mapa'>Centrar con mi GPS</button>" +
       "</div>" +
       "<p class='ayuda'>" + (borrador.gps
-        ? "Pin marcado. Arrastralo si no está exacto."
-        : "Tocá el mapa o arrastrá el pin hasta tu casa (mirá el techo, la esquina, algo que reconozcas).") +
-      "</p></div>" +
+        ? "📍 Pin marcado — <a target='_blank' rel='noopener' href='" + esc(enlaceMapa(borrador.gps)) +
+          "'>verlo en Google Maps</a>. Arrastralo si hace falta ajustarlo."
+        : "Tocá el mapa hasta encontrar tu casa y marcala.") +
+      "</p></div>";
+
+    html += "<details class='mas-opciones'" + (tieneDatosEscritos ? " open" : "") + ">" +
+      "<summary>¿Preferís escribir la dirección en vez de usar el mapa?</summary>" +
+      "<div style='margin-top:8px'>" +
       campoTexto("direccion", "Dirección (opcional)", borrador.direccion, "Calle y número, si tiene") +
       campoTexto("referencia", "Referencia para encontrarte", borrador.referencia, "Color de casa, esquina, negocio cercano") +
-      selectZona(borrador.zona);
-    if (borrador.gps) {
-      html += "<p class='dato'>📍 Ubicación marcada. " +
-        "<a target='_blank' rel='noopener' href='" + esc(enlaceMapa(borrador.gps)) + "'>Ver en Google Maps</a></p>";
-    } else {
+      selectZona(borrador.zona) +
+      "</div></details>";
+
+    if (!borrador.gps && !tieneDatosEscritos) {
       html += "<p class='ayuda'>Necesitamos el pin en el mapa o una dirección con referencia para poder llegar.</p>";
     }
-    html += "<p class='ayuda'>💡 Si el mapa no te termina de ubicar, contanos por WhatsApp cuando mandes el pedido " +
-      "(clip 📎 → Ubicación) y lo ajustamos.</p>";
+    html += "<p class='ayuda'>💡 Si podés, compartinos también tu ubicación de WhatsApp al mandar el pedido (clip 📎 → Ubicación).</p>";
   }
 
   html += "<div class='campo'><label for='observaciones'>Observaciones</label>" +
@@ -348,6 +354,7 @@ function confirmarPedidoCliente() {
 
 let mapaLeaflet = null;
 let marcadorLeaflet = null;
+let autoUbicacionIntentada = false;
 
 function iniciarMapa() {
   const el = document.getElementById("mapa-ubicacion");
@@ -367,6 +374,14 @@ function iniciarMapa() {
     marcadorLeaflet.setLatLng(ev.latlng);
     guardarPosicionMarcador();
   });
+
+  /* Un solo intento automático y silencioso por pedido: si el navegador ya
+     tiene el permiso (o el cliente lo acepta ahí mismo), el mapa arranca
+     cerca de él sin que tenga que tocar el botón. Si falla, no molesta. */
+  if (!borrador.gps && !autoUbicacionIntentada) {
+    autoUbicacionIntentada = true;
+    centrarConGps(true);
+  }
 }
 
 function destruirMapa() {
@@ -380,14 +395,13 @@ function guardarPosicionMarcador() {
 }
 
 /* Botón "Centrar con mi GPS": solo mueve el mapa a un punto de partida.
-   El cliente siempre puede (y conviene que) corrija arrastrando el pin. */
-function centrarConGps() {
-  if (!navigator.geolocation) {
-    mostrarAviso("Este navegador no permite ubicación automática. Marcá el pin a mano.", "error");
-    return;
-  }
-  if (!window.isSecureContext) {
-    mostrarAviso("Esto solo funciona en el sitio publicado (https). Marcá el pin a mano.", "error");
+   El cliente siempre puede (y conviene que) corrija arrastrando el pin.
+   silencioso=true se usa en el intento automático: si falla o el permiso
+   no está concedido todavía, no muestra ningún error, total el cliente
+   puede marcar el pin a mano igual. */
+function centrarConGps(silencioso) {
+  if (!navigator.geolocation || !window.isSecureContext) {
+    if (!silencioso) mostrarAviso("No se pudo activar la ubicación automática. Marcá el pin a mano.", "error");
     return;
   }
 
@@ -396,12 +410,13 @@ function centrarConGps() {
       lat: Number(pos.coords.latitude.toFixed(6)),
       lng: Number(pos.coords.longitude.toFixed(6))
     };
-    mostrarAviso("Listo. Revisá el pin y ajustalo si no quedó exacto.", "ok");
+    if (!silencioso) mostrarAviso("Listo. Revisá el pin y ajustalo si no quedó exacto.", "ok");
     render();
   };
 
-  mostrarAviso("Buscando tu ubicación...");
+  if (!silencioso) mostrarAviso("Buscando tu ubicación...");
   navigator.geolocation.getCurrentPosition(listo, function (err) {
+    if (silencioso) return;
     if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
       mostrarAviso("Sigo buscando, puede tardar un poco más...");
       navigator.geolocation.getCurrentPosition(listo, function (err2) {

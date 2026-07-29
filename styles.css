@@ -345,9 +345,12 @@ textarea{min-height:70px;resize:vertical;}
 
 /* ---------- Mapa para marcar ubicación ---------- */
 #mapa-ubicacion{
-  height:260px;border-radius:12px;overflow:hidden;
+  height:320px;border-radius:12px;overflow:hidden;
   border:1px solid var(--linea);margin-bottom:8px;
   background:var(--gris-clara);
+}
+@media(min-width:700px){
+  #mapa-ubicacion{height:280px;}
 }
 
 /* ---------- Chapa de estado de conexión ---------- */
