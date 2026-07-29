@@ -228,10 +228,13 @@ function vistaPedido(estado) {
       "<div class='campo'><button class='btn btn-suave btn-ancho' data-accion='usar-ubicacion'>Usar mi ubicación</button></div>";
     if (borrador.gps) {
       html += "<p class='dato'>Ubicación guardada. " +
-        "<a target='_blank' rel='noopener' href='" + esc(enlaceMapa(borrador.gps)) + "'>Ver en Google Maps</a></p>";
+        "<a target='_blank' rel='noopener' href='" + esc(enlaceMapa(borrador.gps)) + "'>Ver en Google Maps</a> — " +
+        "revisá que el pin esté en el lugar correcto.</p>";
     } else {
       html += "<p class='ayuda'>Necesitamos tu ubicación GPS o una dirección con referencia para poder llegar.</p>";
     }
+    html += "<p class='ayuda'>💡 La forma más segura de ubicarte: cuando mandes el pedido por WhatsApp, " +
+      "compartí ahí también tu ubicación (clip 📎 → Ubicación). Es más precisa que el botón de arriba.</p>";
   }
 
   html += "<div class='campo'><label for='observaciones'>Observaciones</label>" +

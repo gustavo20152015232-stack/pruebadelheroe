@@ -531,7 +531,12 @@ function textoPedidoWhatsapp(pedido) {
   if (pedido.tipoEntrega === "delivery") {
     l.push("Dirección: " + (pedido.direccion || "(sin dirección escrita)"));
     l.push("Referencia: " + (pedido.referencia || "(sin referencia)"));
-    if (pedido.gps) l.push("Ubicación: " + enlaceMapa(pedido.gps));
+    if (pedido.gps) l.push("Ubicación (del navegador): " + enlaceMapa(pedido.gps));
+    l.push("");
+    /* La ubicación del navegador puede fallar o ser imprecisa (sobre todo si el link
+       se abrió desde adentro de WhatsApp/Instagram). Pedirla acá, como ubicación nativa
+       de WhatsApp, es más confiable y no requiere que el cliente cambie de navegador. */
+    l.push("📍 Para ubicarnos mejor, mandanos también tu UBICACIÓN de WhatsApp: tocá el clip 📎 (o +) y elegí \"Ubicación\".");
   }
   l.push("Observaciones: " + (pedido.observaciones || "-"));
   return l.join("\n");
