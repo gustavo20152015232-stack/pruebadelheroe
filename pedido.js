@@ -222,19 +222,26 @@ function vistaPedido(estado) {
 
   if (borrador.tipoEntrega === "delivery") {
     html += "<hr class='sep'><h3>¿Dónde te llevamos el pedido?</h3>" +
-      campoTexto("direccion", "Dirección (opcional)", borrador.direccion, "Calle y número") +
+      "<div class='campo'><label>Marcá tu casa en el mapa</label>" +
+      "<div id='mapa-ubicacion'></div>" +
+      "<div class='fila'>" +
+      "<button type='button' class='btn btn-suave btn-chico' data-accion='centrar-mapa'>Centrar con mi GPS</button>" +
+      "</div>" +
+      "<p class='ayuda'>" + (borrador.gps
+        ? "Pin marcado. Arrastralo si no está exacto."
+        : "Tocá el mapa o arrastrá el pin hasta tu casa (mirá el techo, la esquina, algo que reconozcas).") +
+      "</p></div>" +
+      campoTexto("direccion", "Dirección (opcional)", borrador.direccion, "Calle y número, si tiene") +
       campoTexto("referencia", "Referencia para encontrarte", borrador.referencia, "Color de casa, esquina, negocio cercano") +
-      selectZona(borrador.zona) +
-      "<div class='campo'><button class='btn btn-suave btn-ancho' data-accion='usar-ubicacion'>Usar mi ubicación</button></div>";
+      selectZona(borrador.zona);
     if (borrador.gps) {
-      html += "<p class='dato'>Ubicación guardada. " +
-        "<a target='_blank' rel='noopener' href='" + esc(enlaceMapa(borrador.gps)) + "'>Ver en Google Maps</a> — " +
-        "revisá que el pin esté en el lugar correcto.</p>";
+      html += "<p class='dato'>📍 Ubicación marcada. " +
+        "<a target='_blank' rel='noopener' href='" + esc(enlaceMapa(borrador.gps)) + "'>Ver en Google Maps</a></p>";
     } else {
-      html += "<p class='ayuda'>Necesitamos tu ubicación GPS o una dirección con referencia para poder llegar.</p>";
+      html += "<p class='ayuda'>Necesitamos el pin en el mapa o una dirección con referencia para poder llegar.</p>";
     }
-    html += "<p class='ayuda'>💡 La forma más segura de ubicarte: cuando mandes el pedido por WhatsApp, " +
-      "compartí ahí también tu ubicación (clip 📎 → Ubicación). Es más precisa que el botón de arriba.</p>";
+    html += "<p class='ayuda'>💡 Si el mapa no te termina de ubicar, contanos por WhatsApp cuando mandes el pedido " +
+      "(clip 📎 → Ubicación) y lo ajustamos.</p>";
   }
 
   html += "<div class='campo'><label for='observaciones'>Observaciones</label>" +
@@ -337,37 +344,72 @@ function confirmarPedidoCliente() {
   window.scrollTo(0, 0);
 }
 
-function pedirUbicacion() {
+/* ---------- Mapa para marcar la ubicación a mano ---------- */
+
+let mapaLeaflet = null;
+let marcadorLeaflet = null;
+
+function iniciarMapa() {
+  const el = document.getElementById("mapa-ubicacion");
+  if (!el || typeof L === "undefined") return;
+  destruirMapa();
+  const centro = borrador.gps || MAPA_CENTRO;
+  mapaLeaflet = L.map(el, { attributionControl: false }).setView([centro.lat, centro.lng], MAPA_CENTRO.zoom);
+  /* Imagen satelital (Esri, gratis y sin API key): en pueblos sin nombres de
+     calle es mucho más útil que un mapa de rutas, porque se ve la casa. */
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 19,
+    attribution: "Esri"
+  }).addTo(mapaLeaflet);
+  marcadorLeaflet = L.marker([centro.lat, centro.lng], { draggable: true }).addTo(mapaLeaflet);
+  marcadorLeaflet.on("dragend", guardarPosicionMarcador);
+  mapaLeaflet.on("click", function (ev) {
+    marcadorLeaflet.setLatLng(ev.latlng);
+    guardarPosicionMarcador();
+  });
+}
+
+function destruirMapa() {
+  if (mapaLeaflet) { mapaLeaflet.remove(); mapaLeaflet = null; marcadorLeaflet = null; }
+}
+
+function guardarPosicionMarcador() {
+  const pos = marcadorLeaflet.getLatLng();
+  borrador.gps = { lat: Number(pos.lat.toFixed(6)), lng: Number(pos.lng.toFixed(6)) };
+  render();
+}
+
+/* Botón "Centrar con mi GPS": solo mueve el mapa a un punto de partida.
+   El cliente siempre puede (y conviene que) corrija arrastrando el pin. */
+function centrarConGps() {
   if (!navigator.geolocation) {
-    mostrarAviso("Este navegador no permite compartir la ubicación.", "error");
+    mostrarAviso("Este navegador no permite ubicación automática. Marcá el pin a mano.", "error");
     return;
   }
   if (!window.isSecureContext) {
-    mostrarAviso("La ubicación solo funciona con el sitio publicado (https) o en localhost, no abriendo el archivo directo.", "error");
+    mostrarAviso("Esto solo funciona en el sitio publicado (https). Marcá el pin a mano.", "error");
     return;
   }
 
-  const guardarUbicacion = function (pos) {
+  const listo = function (pos) {
     borrador.gps = {
       lat: Number(pos.coords.latitude.toFixed(6)),
       lng: Number(pos.coords.longitude.toFixed(6))
     };
-    mostrarAviso("Ubicación guardada.", "ok");
+    mostrarAviso("Listo. Revisá el pin y ajustalo si no quedó exacto.", "ok");
     render();
   };
 
   mostrarAviso("Buscando tu ubicación...");
-  navigator.geolocation.getCurrentPosition(guardarUbicacion, function (err) {
-    /* La primera vuelta pide GPS de alta precisión; si eso falla, reintentamos
-       con precisión normal y más tiempo, que en interiores suele andar mejor. */
+  navigator.geolocation.getCurrentPosition(listo, function (err) {
     if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
       mostrarAviso("Sigo buscando, puede tardar un poco más...");
-      navigator.geolocation.getCurrentPosition(guardarUbicacion, function (err2) {
-        mostrarAviso(mensajeErrorUbicacion(err2), "error");
+      navigator.geolocation.getCurrentPosition(listo, function (err2) {
+        mostrarAviso(mensajeErrorUbicacion(err2) + " Mientras tanto, marcá el pin a mano.", "error");
       }, { enableHighAccuracy: false, timeout: 20000 });
       return;
     }
-    mostrarAviso(mensajeErrorUbicacion(err), "error");
+    mostrarAviso(mensajeErrorUbicacion(err) + " Mientras tanto, marcá el pin a mano.", "error");
   }, { enableHighAccuracy: true, timeout: 10000 });
 }
 
@@ -406,6 +448,12 @@ function render() {
       try { nodo.setSelectionRange(inicio, fin); } catch (e) { /* campos sin selección */ }
     }
   }
+
+  if (borrador.tipoEntrega === "delivery") {
+    iniciarMapa();
+  } else {
+    destruirMapa();
+  }
 }
 
 document.addEventListener("click", function (ev) {
@@ -430,8 +478,8 @@ document.addEventListener("click", function (ev) {
   } else if (accion === "ir-carrito") {
     const c = document.getElementById("carrito");
     if (c) c.scrollIntoView({ block: "start" });
-  } else if (accion === "usar-ubicacion") {
-    pedirUbicacion();
+  } else if (accion === "centrar-mapa") {
+    centrarConGps();
   } else if (accion === "confirmar-pedido") {
     confirmarPedidoCliente();
     render();

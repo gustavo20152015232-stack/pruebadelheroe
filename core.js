@@ -24,6 +24,11 @@ const MAX_PEDIDOS_SALIDA = 4;   // máximo de pedidos por salida
    Cambialas por los barrios reales del recorrido. */
 const ZONAS = ["Centro", "Norte", "Sur", "Este", "Oeste", "Otra"];
 
+/* Centro del mapa donde el cliente marca su ubicación (útil en pueblos sin
+   nombres de calle). Poné las coordenadas de la plaza o el centro del pueblo:
+   las buscás en Google Maps, clic derecho sobre el punto -> copian lat, lng. */
+const MAPA_CENTRO = { lat: -27.4514, lng: -58.9867, zoom: 14 };
+
 const CLAVE_ESTADO = "heladeria_demo_estado";
 const VERSION_ESTADO = 2;
 const CANAL = "heladeria_demo_canal";
