@@ -207,6 +207,13 @@ textarea{min-height:70px;resize:vertical;}
 .dato strong{font-weight:bold;}
 .acciones{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
 
+.dia-caja summary{
+  cursor:pointer;list-style:none;font-weight:bold;
+  display:flex;justify-content:space-between;gap:10px;
+}
+.dia-caja summary::-webkit-details-marker{display:none;}
+.dia-caja[open] summary{margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--linea);}
+
 .mas-opciones{margin-top:6px;}
 .mas-opciones summary{
   cursor:pointer;font-size:.85rem;color:var(--noche-suave);

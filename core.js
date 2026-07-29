@@ -660,6 +660,16 @@ function marcarCobrado(pedidoId) {
   mostrarAviso("Cobro registrado en Caja.", "ok");
 }
 
+function registrarGasto(monto, motivo, pago) {
+  storageService.actualizar(function (est) {
+    est.caja.unshift({
+      id: nuevoId(), pedidoId: null, numero: "", cliente: motivo,
+      importe: -Math.abs(monto), pago: pago, fecha: new Date().toISOString(), tipo: "gasto"
+    });
+  });
+  mostrarAviso("Gasto registrado en Caja.", "ok");
+}
+
 function cambiarFechaEntrega(pedidoId, fecha) {
   if (desdeYmd(fecha).getDay() === 0) {
     mostrarAviso("Los domingos no se reparte. Elegí otro día.", "error");

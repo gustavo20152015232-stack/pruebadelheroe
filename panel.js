@@ -603,6 +603,12 @@ function tarjetaSalida(s, estado, cerrada) {
       }
       html += "<button class='btn btn-chico btn-principal' data-accion='entregado' data-id='" + p.id + "'>Entregado</button>";
       html += "<button class='btn btn-chico btn-suave' data-accion='no-entregado' data-id='" + p.id + "'>No entregado</button>";
+      if (p.telefono) {
+        html += "<a class='btn btn-chico btn-suave' target='_blank' rel='noopener' href='" +
+          esc(enlaceWhatsapp(p.telefono, "Hola " + p.cliente + "! Tu pedido " + p.numero +
+            " ya salió y está en camino 🛵🍦. En un rato llega.")) +
+          "'>Avisar que está en camino</a>";
+      }
     }
     html += "</div></div>";
   });
@@ -892,26 +898,38 @@ function cargarPedidosEjemplo() {
 function vistaCaja(estado) {
   const hoy = hoyYmd();
   const delDia = estado.caja.filter(function (m) { return ymd(new Date(m.fecha)) === hoy; });
-  const total = delDia.reduce(function (s, m) { return s + m.importe; }, 0);
-  const efectivo = delDia.filter(function (m) { return m.pago === "efectivo"; })
+  const ventasDia = delDia.filter(function (m) { return m.tipo !== "gasto"; });
+  const gastosDia = delDia.filter(function (m) { return m.tipo === "gasto"; });
+
+  const total = ventasDia.reduce(function (s, m) { return s + m.importe; }, 0);
+  const efectivo = ventasDia.filter(function (m) { return m.pago === "efectivo"; })
     .reduce(function (s, m) { return s + m.importe; }, 0);
-  const transferencia = delDia.filter(function (m) { return m.pago === "transferencia"; })
+  const transferencia = ventasDia.filter(function (m) { return m.pago === "transferencia"; })
     .reduce(function (s, m) { return s + m.importe; }, 0);
+  const gastos = gastosDia.reduce(function (s, m) { return s + m.importe; }, 0); // ya viene negativo
 
   const canalDeMovimiento = function (m) {
     const p = estado.pedidos.find(function (x) { return x.id === m.pedidoId; });
     return p && p.tipoEntrega === "delivery" ? "delivery" : "local";
   };
-  const delivery = delDia.filter(function (m) { return canalDeMovimiento(m) === "delivery"; })
+  const delivery = ventasDia.filter(function (m) { return canalDeMovimiento(m) === "delivery"; })
     .reduce(function (s, m) { return s + m.importe; }, 0);
-  const local = delDia.filter(function (m) { return canalDeMovimiento(m) === "local"; })
+  const local = ventasDia.filter(function (m) { return canalDeMovimiento(m) === "local"; })
     .reduce(function (s, m) { return s + m.importe; }, 0);
 
   let html = "<div class='encabezado-vista'><h1>Caja</h1>" +
     "<p>El dinero entra solamente cuando marcás una venta como cobrada.</p></div>";
 
+  html += "<div class='fila' style='margin-bottom:12px'>" +
+    "<button class='btn btn-suave' data-accion='registrar-gasto'>Registrar gasto / retiro</button></div>";
+
   html += "<div class='tarjeta'><div class='resumen'>" +
-    "<div><span class='cifra'>" + pesos(total) + "</span><span class='rotulo'>Cobrado hoy</span></div>" +
+    "<div><span class='cifra'>" + pesos(total) + "</span><span class='rotulo'>Ventas cobradas</span></div>" +
+    "<div><span class='cifra'>" + pesos(-gastos) + "</span><span class='rotulo'>Gastos / retiros</span></div>" +
+    "<div><span class='cifra'>" + pesos(total + gastos) + "</span><span class='rotulo'>Neto en caja</span></div>" +
+    "</div></div>";
+
+  html += "<div class='tarjeta'><div class='resumen'>" +
     "<div><span class='cifra'>" + pesos(efectivo) + "</span><span class='rotulo'>Efectivo</span></div>" +
     "<div><span class='cifra'>" + pesos(transferencia) + "</span><span class='rotulo'>Transferencia</span></div>" +
     "</div></div>";
@@ -921,35 +939,207 @@ function vistaCaja(estado) {
     "<div><span class='cifra'>" + pesos(local) + "</span><span class='rotulo'>Local / retiro</span></div>" +
     "</div></div>";
 
+  html += seccionSemana(estado);
+
   html += "<div class='grupo-titulo'>Movimientos de hoy<span class='cuenta'>" + delDia.length + "</span></div>";
   if (!delDia.length) {
-    html += "<div class='vacio'>Todavía no se cobró ninguna venta hoy.</div>";
+    html += "<div class='vacio'>Todavía no hay movimientos hoy.</div>";
   } else {
     html += "<div class='tarjeta'>";
     delDia.forEach(function (m) {
-      const esDelivery = canalDeMovimiento(m) === "delivery";
-      html += "<div class='mov " + (m.tipo === "anulacion" ? "anulacion" : "") + "'>" +
-        "<span><strong>" + esc(m.numero) + "</strong> · " + esc(m.cliente) +
-        "<br><span class='ayuda'>" + (m.pago === "efectivo" ? "Efectivo" : "Transferencia") +
-        " · " + (esDelivery ? "Delivery" : "Local") +
-        " · " + fechaHora(m.fecha) + (m.tipo === "anulacion" ? " · anulación" : "") + "</span></span>" +
-        "<span><strong>" + pesos(m.importe) + "</strong></span></div>";
+      html += movimientoCajaHTML(m, canalDeMovimiento);
     });
     html += "</div>";
   }
 
-  const otros = estado.caja.filter(function (m) { return ymd(new Date(m.fecha)) !== hoy; });
-  if (otros.length) {
-    html += "<div class='grupo-titulo'>Días anteriores<span class='cuenta'>" + otros.length + "</span></div><div class='tarjeta'>";
-    otros.forEach(function (m) {
-      html += "<div class='mov " + (m.tipo === "anulacion" ? "anulacion" : "") + "'>" +
-        "<span><strong>" + esc(m.numero) + "</strong> · " + esc(m.cliente) +
-        "<br><span class='ayuda'>" + fechaHora(m.fecha) + "</span></span>" +
-        "<span>" + pesos(m.importe) + "</span></div>";
-    });
-    html += "</div>";
+  html += seccionDiasAnteriores(estado, canalDeMovimiento);
+
+  return html;
+}
+
+/* Totales de un día puntual (para el resumen semanal y el historial). */
+function totalesDelDia(estado, fechaYmd) {
+  const movs = estado.caja.filter(function (m) { return ymd(new Date(m.fecha)) === fechaYmd; });
+  const ventas = movs.filter(function (m) { return m.tipo !== "gasto"; })
+    .reduce(function (s, m) { return s + m.importe; }, 0);
+  const gastos = movs.filter(function (m) { return m.tipo === "gasto"; })
+    .reduce(function (s, m) { return s + m.importe; }, 0);
+  return { movimientos: movs, ventas: ventas, gastos: gastos, neto: ventas + gastos };
+}
+
+const FORMATO_DIA_CORTO = new Intl.DateTimeFormat("es-AR", { weekday: "short", day: "2-digit", month: "2-digit" });
+
+function seccionSemana(estado) {
+  const hoy = hoyYmd();
+  const dias = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    dias.push(ymd(d));
   }
 
+  let html = "<div class='tarjeta'><h2>Últimos 7 días</h2>";
+  let netoSemana = 0;
+  dias.forEach(function (dia) {
+    const t = totalesDelDia(estado, dia);
+    netoSemana += t.neto;
+    html += "<div class='mov'>" +
+      "<span>" + (dia === hoy ? "Hoy" : FORMATO_DIA_CORTO.format(desdeYmd(dia))) + "</span>" +
+      "<span><strong>" + pesos(t.neto) +
+      (t.gastos ? "</strong> <span class='ayuda'>(gastos " + pesos(-t.gastos) + ")</span>" : "</strong>") +
+      "</span></div>";
+  });
+  html += "<div class='total'><span>Total semana</span><span>" + pesos(netoSemana) + "</span></div>";
+  html += "</div>";
+  return html;
+}
+
+function seccionDiasAnteriores(estado, canalDeMovimiento) {
+  const hoy = hoyYmd();
+  const porDia = {};
+  estado.caja.forEach(function (m) {
+    const dia = ymd(new Date(m.fecha));
+    if (dia === hoy) return;
+    if (!porDia[dia]) porDia[dia] = [];
+    porDia[dia].push(m);
+  });
+  const dias = Object.keys(porDia).sort().reverse();
+  if (!dias.length) return "";
+
+  let html = "<div class='grupo-titulo'>Días anteriores<span class='cuenta'>" + dias.length + "</span></div>";
+  dias.forEach(function (dia) {
+    const t = totalesDelDia(estado, dia);
+    html += "<details class='tarjeta dia-caja'><summary><span>" + fechaLarga(dia) + "</span>" +
+      "<span>" + pesos(t.neto) + "</span></summary><div>";
+    t.movimientos.forEach(function (m) { html += movimientoCajaHTML(m, canalDeMovimiento); });
+    html += "</div></details>";
+  });
+  return html;
+}
+
+function movimientoCajaHTML(m, canalDeMovimiento) {
+  if (m.tipo === "gasto") {
+    return "<div class='mov anulacion'>" +
+      "<span><strong>Gasto</strong> · " + esc(m.cliente) +
+      "<br><span class='ayuda'>" + (m.pago === "efectivo" ? "Efectivo" : "Transferencia") +
+      " · " + fechaHora(m.fecha) + "</span></span>" +
+      "<span><strong>" + pesos(m.importe) + "</strong></span></div>";
+  }
+  const esDelivery = canalDeMovimiento(m) === "delivery";
+  return "<div class='mov " + (m.tipo === "anulacion" ? "anulacion" : "") + "'>" +
+    "<span><strong>" + esc(m.numero) + "</strong> · " + esc(m.cliente) +
+    "<br><span class='ayuda'>" + (m.pago === "efectivo" ? "Efectivo" : "Transferencia") +
+    " · " + (esDelivery ? "Delivery" : "Local") +
+    " · " + fechaHora(m.fecha) + (m.tipo === "anulacion" ? " · anulación" : "") + "</span></span>" +
+    "<span><strong>" + pesos(m.importe) + "</strong></span></div>";
+}
+
+function abrirRegistrarGasto() {
+  abrirModal({
+    titulo: "Registrar gasto o retiro",
+    cuerpo:
+      "<div class='campo'><label for='gasto-monto'>Monto</label>" +
+      "<input id='gasto-monto' type='number' min='1' step='1' placeholder='Ej. 5000'></div>" +
+      "<div class='campo'><label for='gasto-motivo'>Motivo</label>" +
+      "<input id='gasto-motivo' type='text' placeholder='Ej. Compra de mercadería, retiro, sueldo...'></div>" +
+      "<div class='campo'><label>Forma de pago</label><div class='opciones'>" +
+      "<label><input type='radio' name='gasto-pago' value='efectivo' checked> Efectivo</label>" +
+      "<label><input type='radio' name='gasto-pago' value='transferencia'> Transferencia</label>" +
+      "</div></div>",
+    textoAceptar: "Registrar",
+    clase: "btn-principal",
+    onAceptar: function () {
+      const monto = Number(document.getElementById("gasto-monto").value);
+      const motivo = document.getElementById("gasto-motivo").value.trim();
+      const pago = document.querySelector("input[name='gasto-pago']:checked").value;
+      if (!monto || monto <= 0) { mostrarAviso("Escribí un monto válido.", "error"); return false; }
+      if (!motivo) { mostrarAviso("Escribí el motivo del gasto.", "error"); return false; }
+      registrarGasto(monto, motivo, pago);
+      return true;
+    }
+  });
+}
+
+/* ---------------------------------------------------------
+   CLIENTES
+   Se arma solo a partir de los pedidos: no hay una base aparte.
+   --------------------------------------------------------- */
+
+let filtroClientes = "";
+
+/* Link a la página pública, calculado según dónde está publicado el panel
+   (funciona igual en local, en GitHub Pages o en cualquier dominio). */
+function linkPedidoCliente() {
+  return location.origin + location.pathname.replace(/panel\.html.*$/, "index.html");
+}
+
+function clientesUnicos(estado) {
+  const mapa = {};
+  estado.pedidos.forEach(function (p) {
+    const tel = soloDigitos(p.telefono);
+    if (!tel) return;
+    if (!mapa[tel]) {
+      mapa[tel] = { telefono: p.telefono, nombre: p.cliente, pedidos: 0, gastado: 0, ultimaFecha: p.creado };
+    }
+    const c = mapa[tel];
+    c.pedidos += 1;
+    if (p.creado > c.ultimaFecha) {
+      c.ultimaFecha = p.creado;
+      c.nombre = p.cliente;
+      c.telefono = p.telefono;
+    }
+    if (p.cobrado) c.gastado += p.total;
+  });
+  return Object.keys(mapa).map(function (k) { return mapa[k]; })
+    .sort(function (a, b) { return a.ultimaFecha < b.ultimaFecha ? 1 : -1; });
+}
+
+function vistaClientes(estado) {
+  const todos = clientesUnicos(estado);
+  const filtrados = filtroClientes.trim()
+    ? todos.filter(function (c) {
+        const t = normalizar(filtroClientes);
+        const telBuscado = soloDigitos(filtroClientes);
+        return normalizar(c.nombre).indexOf(t) >= 0 ||
+          (telBuscado && soloDigitos(c.telefono).indexOf(telBuscado) >= 0);
+      })
+    : todos;
+
+  let html = "<div class='encabezado-vista'><h1>Clientes</h1>" +
+    "<p>Se arma solo con los pedidos que van llegando. Usalo para mandarle el link a alguien puntual.</p></div>";
+
+  html += "<div class='tarjeta buscador'><div class='campo'><label for='busca-cliente'>Buscar cliente</label>" +
+    "<input id='busca-cliente' type='search' data-filtro-cliente='1' value='" + esc(filtroClientes) +
+    "' placeholder='Nombre o teléfono'></div></div>";
+
+  if (!todos.length) {
+    html += "<div class='vacio'>Todavía no hay clientes cargados — van a ir apareciendo con los pedidos.</div>";
+    return html;
+  }
+  if (!filtrados.length) {
+    html += "<div class='vacio'>Ninguno coincide con esa búsqueda.</div>";
+    return html;
+  }
+
+  const link = linkPedidoCliente();
+  html += "<div class='grupo-titulo'>Clientes<span class='cuenta'>" + filtrados.length + "</span></div>";
+  filtrados.forEach(function (c) {
+    const primerNombre = (c.nombre || "").trim().split(" ")[0] || "";
+    const mensaje = "Hola" + (primerNombre ? " " + primerNombre : "") +
+      "! Te paso el link para hacer tu pedido en Heladería y Congelados: " + link;
+    html += "<div class='tarjeta pedido'>" +
+      "<div class='pedido-cabecera'>" +
+      "<div><div class='pedido-numero'>" + esc(c.nombre || "Sin nombre") + "</div>" +
+      "<div class='pedido-meta'>" + esc(c.telefono) + "</div></div>" +
+      "<span class='pill pill-info'>" + c.pedidos + (c.pedidos === 1 ? " pedido" : " pedidos") + "</span>" +
+      "</div>" +
+      "<div class='dato'><strong>Último pedido:</strong> " + fechaHora(c.ultimaFecha) + "</div>" +
+      (c.gastado ? "<div class='dato'><strong>Total gastado:</strong> " + pesos(c.gastado) + "</div>" : "") +
+      "<div class='acciones'>" +
+      "<a class='btn btn-principal btn-chico' target='_blank' rel='noopener' href='" +
+      esc(enlaceWhatsapp(c.telefono, mensaje)) + "'>Enviar link por WhatsApp</a>" +
+      "</div></div>";
+  });
   return html;
 }
 
@@ -957,7 +1147,7 @@ function vistaCaja(estado) {
    RUTEO Y RENDER
    --------------------------------------------------------- */
 
-const RUTAS = ["/ventas", "/envios", "/stock", "/caja"];
+const RUTAS = ["/ventas", "/envios", "/stock", "/caja", "/clientes"];
 
 function rutaActual() {
   const h = location.hash.replace("#", "");
@@ -979,6 +1169,7 @@ function render() {
   else if (ruta === "/envios") html = vistaEnvios(estado);
   else if (ruta === "/stock") html = vistaStock(estado);
   else if (ruta === "/caja") html = vistaCaja(estado);
+  else if (ruta === "/clientes") html = vistaClientes(estado);
   app.innerHTML = html;
 
   if (idFoco) {
@@ -1151,6 +1342,9 @@ document.addEventListener("click", function (ev) {
       if (input) input.click();
       break;
     }
+    case "registrar-gasto":
+      abrirRegistrarGasto();
+      break;
     case "restablecer":
       pedirConfirmacion("Restablecer demo",
         "Se borran pedidos, salidas y movimientos de caja, y el stock vuelve a " + STOCK_INICIAL + " paquetes.",
@@ -1170,7 +1364,11 @@ document.addEventListener("input", function (ev) {
   const pm = ev.target.getAttribute("data-pm");
   if (pm) { pedidoManual[pm] = ev.target.value; return; }
   const filtro = ev.target.getAttribute("data-filtro");
-  if (filtro) { filtroVentas[filtro] = ev.target.value; render(); }
+  if (filtro) { filtroVentas[filtro] = ev.target.value; render(); return; }
+  if (ev.target.getAttribute("data-filtro-cliente")) {
+    filtroClientes = ev.target.value;
+    render();
+  }
 });
 
 document.addEventListener("change", function (ev) {
