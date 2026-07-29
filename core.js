@@ -106,6 +106,7 @@ const storageService = (function () {
       pedidos: [],
       salidas: [],
       caja: [],
+      cajaDiaria: [],
       movimientosStock: [],
       config: {
         whatsapp: WHATSAPP_NUMBER,
@@ -123,6 +124,7 @@ const storageService = (function () {
     datos.pedidos = comoLista(datos.pedidos);
     datos.salidas = comoLista(datos.salidas);
     datos.caja = comoLista(datos.caja);
+    datos.cajaDiaria = comoLista(datos.cajaDiaria);
     datos.movimientosStock = comoLista(datos.movimientosStock);
     datos.pedidos.forEach(function (p) { p.items = comoLista(p.items); });
     datos.salidas.forEach(function (s) { s.pedidos = comoLista(s.pedidos); });
@@ -677,6 +679,60 @@ function registrarGasto(monto, motivo, pago) {
     });
   });
   mostrarAviso("Gasto registrado en Caja.", "ok");
+}
+
+/* ---------- Apertura y cierre de caja del día ---------- */
+
+function registroCajaDelDia(estado, fecha) {
+  return (estado.cajaDiaria || []).find(function (r) { return r.fecha === fecha; }) || null;
+}
+
+function abrirCajaDelDia(fecha, monto) {
+  storageService.actualizar(function (est) {
+    if (!est.cajaDiaria) est.cajaDiaria = [];
+    let r = est.cajaDiaria.find(function (x) { return x.fecha === fecha; });
+    if (!r) {
+      r = {
+        id: nuevoId(), fecha: fecha, apertura: 0, fechaApertura: null,
+        cerrado: false, contado: null, diferencia: null, fechaCierre: null
+      };
+      est.cajaDiaria.unshift(r);
+    }
+    r.apertura = monto;
+    r.fechaApertura = new Date().toISOString();
+    r.cerrado = false;
+    r.contado = null;
+    r.diferencia = null;
+    r.fechaCierre = null;
+  });
+  mostrarAviso("Caja abierta con " + pesos(monto) + ".", "ok");
+}
+
+function cerrarCajaDelDia(fecha, esperado, contado) {
+  storageService.actualizar(function (est) {
+    if (!est.cajaDiaria) est.cajaDiaria = [];
+    let r = est.cajaDiaria.find(function (x) { return x.fecha === fecha; });
+    if (!r) {
+      r = {
+        id: nuevoId(), fecha: fecha, apertura: 0, fechaApertura: null,
+        cerrado: false, contado: null, diferencia: null, fechaCierre: null
+      };
+      est.cajaDiaria.unshift(r);
+    }
+    r.contado = contado;
+    r.diferencia = contado - esperado;
+    r.cerrado = true;
+    r.fechaCierre = new Date().toISOString();
+  });
+  mostrarAviso("Caja cerrada.", "ok");
+}
+
+function reabrirCajaDelDia(fecha) {
+  storageService.actualizar(function (est) {
+    const r = (est.cajaDiaria || []).find(function (x) { return x.fecha === fecha; });
+    if (r) { r.cerrado = false; r.contado = null; r.diferencia = null; r.fechaCierre = null; }
+  });
+  mostrarAviso("Cierre deshecho. Podés volver a contar y cerrar.", "ok");
 }
 
 function cambiarFechaEntrega(pedidoId, fecha) {

@@ -262,6 +262,7 @@ textarea{min-height:70px;resize:vertical;}
 
 /* ---------- Caja ---------- */
 .resumen{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;}
+.resumen-4{grid-template-columns:repeat(2,1fr);}
 .resumen div{background:var(--hielo);border-radius:12px;padding:10px 6px;}
 .resumen .cifra{font-size:1.1rem;font-weight:bold;display:block;}
 .resumen .rotulo{font-size:.72rem;color:var(--noche-suave);text-transform:uppercase;letter-spacing:.05em;}

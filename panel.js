@@ -134,7 +134,10 @@ function tarjetaPedido(p, estado) {
     "<div><div class='pedido-numero'>" + esc(p.numero) + (p.enPuerta ? " · en puerta" : "") + "</div>" +
     "<div class='pedido-meta'>" + fechaHora(p.creado) + "</div></div>" +
     "<div style='text-align:right'><span class='pill pill-" + p.estado + "'>" + p.estado.toUpperCase() + "</span>" +
-    (p.cobrado ? " <span class='pill pill-confirmado'>COBRADO</span>" : "") + "</div></div>";
+    (p.cobrado ? " <span class='pill pill-confirmado'>COBRADO</span>" :
+      (p.pago === "transferencia" && (p.estado === "confirmado" || p.estado === "finalizado")
+        ? " <span class='pill pill-nuevo'>TRANSFERENCIA SIN CONFIRMAR</span>" : "")) +
+    "</div></div>";
 
   const hist = historialDelCliente(estado, p);
   html += "<div class='dato'><strong>" + esc(p.cliente) + "</strong>" +
@@ -173,11 +176,17 @@ function tarjetaPedido(p, estado) {
   }
   /* Los retiros no pasan por Envíos, así que se cierran desde acá. */
   if (p.estado === "confirmado" && p.tipoEntrega === "retiro") {
-    if (!p.cobrado) principal += btn("retirado-cobrado", p.id, "Retirado y cobrado", "btn-principal");
+    if (!p.cobrado) {
+      principal += btn("retirado-cobrado", p.id,
+        p.pago === "transferencia" ? "Retirado y transferencia recibida" : "Retirado y cobrado", "btn-principal");
+    }
     principal += btn("retirado", p.id, "Marcar retirado", "btn-principal");
   }
   if (p.estado === "confirmado" || p.estado === "finalizado") {
-    if (!p.cobrado) principal += btn("cobrar", p.id, "Marcar como cobrado", "btn-principal");
+    if (!p.cobrado) {
+      principal += btn("cobrar", p.id,
+        p.pago === "transferencia" ? "Confirmar transferencia recibida" : "Marcar como cobrado", "btn-principal");
+    }
     secundarias += btn("cancelar-venta", p.id, "Cancelar venta", "btn-suave");
   }
   if (p.estado !== "rechazado" && p.estado !== "cancelado") {
@@ -197,6 +206,21 @@ function tarjetaPedido(p, estado) {
   }
   html += "</div>";
   return html;
+}
+
+/* Si es transferencia, pide confirmar que la plata ya se vio en la cuenta
+   antes de darla por cobrada — en efectivo no hace falta, ya la tenés en la mano. */
+function confirmarCobroConCuidado(pedidoId, accionCobro) {
+  const estado = storageService.leer();
+  const p = estado.pedidos.find(function (x) { return x.id === pedidoId; });
+  if (p && p.pago === "transferencia" && !p.cobrado) {
+    pedirConfirmacion("Confirmar transferencia",
+      "Confirmá que ya viste la transferencia acreditada en tu cuenta o billetera. " +
+      "Si marcás esto sin haberla visto, la Caja va a contar una plata que todavía no llegó.",
+      function () { accionCobro(); return true; }, "Sí, ya la vi");
+  } else {
+    accionCobro();
+  }
 }
 
 function btn(accion, id, texto, clase) {
@@ -920,6 +944,18 @@ function cargarPedidosEjemplo() {
    CAJA
    --------------------------------------------------------- */
 
+function calcularEsperadoEfectivoHoy(estado) {
+  const hoy = hoyYmd();
+  const delDia = estado.caja.filter(function (m) { return ymd(new Date(m.fecha)) === hoy; });
+  const efectivo = delDia.filter(function (m) { return m.tipo !== "gasto" && m.pago === "efectivo"; })
+    .reduce(function (s, m) { return s + m.importe; }, 0);
+  const gastosEfectivo = delDia.filter(function (m) { return m.tipo === "gasto" && m.pago === "efectivo"; })
+    .reduce(function (s, m) { return s + m.importe; }, 0);
+  const registro = registroCajaDelDia(estado, hoy);
+  const apertura = registro ? registro.apertura : 0;
+  return apertura + efectivo + gastosEfectivo;
+}
+
 function vistaCaja(estado) {
   const hoy = hoyYmd();
   const delDia = estado.caja.filter(function (m) { return ymd(new Date(m.fecha)) === hoy; });
@@ -932,6 +968,10 @@ function vistaCaja(estado) {
   const transferencia = ventasDia.filter(function (m) { return m.pago === "transferencia"; })
     .reduce(function (s, m) { return s + m.importe; }, 0);
   const gastos = gastosDia.reduce(function (s, m) { return s + m.importe; }, 0); // ya viene negativo
+  const gastosEfectivo = gastosDia.filter(function (m) { return m.pago === "efectivo"; })
+    .reduce(function (s, m) { return s + m.importe; }, 0); // negativo
+  const gastosTransferencia = gastosDia.filter(function (m) { return m.pago === "transferencia"; })
+    .reduce(function (s, m) { return s + m.importe; }, 0); // negativo
 
   const canalDeMovimiento = function (m) {
     const p = estado.pedidos.find(function (x) { return x.id === m.pedidoId; });
@@ -942,8 +982,32 @@ function vistaCaja(estado) {
   const local = ventasDia.filter(function (m) { return canalDeMovimiento(m) === "local"; })
     .reduce(function (s, m) { return s + m.importe; }, 0);
 
+  const registroHoy = registroCajaDelDia(estado, hoy);
+  const aperturaHoy = registroHoy ? registroHoy.apertura : 0;
+  const esperadoHoy = aperturaHoy + efectivo + gastosEfectivo;
+
   let html = "<div class='encabezado-vista'><h1>Caja</h1>" +
     "<p>El dinero entra solamente cuando marcás una venta como cobrada.</p></div>";
+
+  html += "<div class='tarjeta'>";
+  if (!registroHoy || !registroHoy.fechaApertura) {
+    html += "<h2>Caja del día</h2><p class='ayuda'>Todavía no abriste la caja hoy.</p>" +
+      "<button class='btn btn-principal' data-accion='abrir-caja'>Abrir caja</button>";
+  } else if (!registroHoy.cerrado) {
+    html += "<h2>Caja del día</h2>" +
+      "<p class='dato'>Abierta con <strong>" + pesos(registroHoy.apertura) + "</strong> a las " +
+      soloHora(registroHoy.fechaApertura) + ".</p>" +
+      "<button class='btn btn-principal' data-accion='cerrar-caja'>Cerrar caja</button>";
+  } else {
+    const cuadra = registroHoy.diferencia === 0;
+    html += "<h2>Caja del día — cerrada</h2><div class='resumen'>" +
+      "<div><span class='cifra'>" + pesos(registroHoy.apertura) + "</span><span class='rotulo'>Apertura</span></div>" +
+      "<div><span class='cifra'>" + pesos(registroHoy.contado) + "</span><span class='rotulo'>Contado</span></div>" +
+      "<div><span class='cifra" + (cuadra ? "" : " bajo") + "'>" + pesos(registroHoy.diferencia) +
+      "</span><span class='rotulo'>Diferencia</span></div></div>" +
+      "<button class='btn btn-suave btn-chico' data-accion='reabrir-caja' style='margin-top:10px'>Reabrir para corregir</button>";
+  }
+  html += "</div>";
 
   html += "<div class='fila' style='margin-bottom:12px'>" +
     "<button class='btn btn-suave' data-accion='registrar-gasto'>Registrar gasto / retiro</button></div>";
@@ -951,12 +1015,19 @@ function vistaCaja(estado) {
   html += "<div class='tarjeta'><div class='resumen'>" +
     "<div><span class='cifra'>" + pesos(total) + "</span><span class='rotulo'>Ventas cobradas</span></div>" +
     "<div><span class='cifra'>" + pesos(-gastos) + "</span><span class='rotulo'>Gastos / retiros</span></div>" +
-    "<div><span class='cifra'>" + pesos(total + gastos) + "</span><span class='rotulo'>Neto en caja</span></div>" +
     "</div></div>";
 
-  html += "<div class='tarjeta'><div class='resumen'>" +
-    "<div><span class='cifra'>" + pesos(efectivo) + "</span><span class='rotulo'>Efectivo</span></div>" +
-    "<div><span class='cifra'>" + pesos(transferencia) + "</span><span class='rotulo'>Transferencia</span></div>" +
+  html += "<div class='tarjeta'><h2>Efectivo</h2><div class='resumen resumen-4'>" +
+    "<div><span class='cifra'>" + pesos(aperturaHoy) + "</span><span class='rotulo'>Apertura</span></div>" +
+    "<div><span class='cifra'>" + pesos(efectivo) + "</span><span class='rotulo'>Cobrado</span></div>" +
+    "<div><span class='cifra'>" + pesos(-gastosEfectivo) + "</span><span class='rotulo'>Gastos</span></div>" +
+    "<div><span class='cifra'>" + pesos(esperadoHoy) + "</span><span class='rotulo'>Debería haber en el cajón</span></div>" +
+    "</div></div>";
+
+  html += "<div class='tarjeta'><h2>Transferencia</h2><div class='resumen'>" +
+    "<div><span class='cifra'>" + pesos(transferencia) + "</span><span class='rotulo'>Cobrado</span></div>" +
+    "<div><span class='cifra'>" + pesos(-gastosTransferencia) + "</span><span class='rotulo'>Gastos</span></div>" +
+    "<div><span class='cifra'>" + pesos(transferencia + gastosTransferencia) + "</span><span class='rotulo'>Debería estar en la cuenta</span></div>" +
     "</div></div>";
 
   html += "<div class='tarjeta'><div class='resumen'>" +
@@ -1085,6 +1156,40 @@ function abrirRegistrarGasto() {
   });
 }
 
+function abrirModalAbrirCaja() {
+  abrirModal({
+    titulo: "Abrir caja",
+    cuerpo: "<p class='ayuda'>Contá el efectivo con el que arrancás el día (para dar vueltos) y escribilo acá.</p>" +
+      "<div class='campo'><label for='apertura-monto'>Monto de apertura</label>" +
+      "<input id='apertura-monto' type='number' min='0' step='100' value='0'></div>",
+    textoAceptar: "Abrir caja",
+    clase: "btn-principal",
+    onAceptar: function () {
+      const monto = Number(document.getElementById("apertura-monto").value);
+      if (isNaN(monto) || monto < 0) { mostrarAviso("Escribí un monto válido.", "error"); return false; }
+      abrirCajaDelDia(hoyYmd(), monto);
+      return true;
+    }
+  });
+}
+
+function abrirModalCerrarCaja(esperado) {
+  abrirModal({
+    titulo: "Cerrar caja",
+    cuerpo: "<p class='ayuda'>Esperado según el sistema: <strong>" + pesos(esperado) + "</strong></p>" +
+      "<div class='campo'><label for='cierre-contado'>Contá el efectivo real y escribilo acá</label>" +
+      "<input id='cierre-contado' type='number' min='0' step='100'></div>",
+    textoAceptar: "Cerrar caja",
+    clase: "btn-principal",
+    onAceptar: function () {
+      const contado = Number(document.getElementById("cierre-contado").value);
+      if (isNaN(contado) || contado < 0) { mostrarAviso("Escribí un monto válido.", "error"); return false; }
+      cerrarCajaDelDia(hoyYmd(), esperado, contado);
+      return true;
+    }
+  });
+}
+
 /* ---------------------------------------------------------
    CLIENTES
    Se arma solo a partir de los pedidos: no hay una base aparte.
@@ -1095,7 +1200,10 @@ let filtroClientes = "";
 /* Link a la página pública, calculado según dónde está publicado el panel
    (funciona igual en local, en GitHub Pages o en cualquier dominio). */
 function linkPedidoCliente() {
-  return location.origin + location.pathname.replace(/panel\.html.*$/, "index.html");
+  /* GitHub Pages a veces sirve "/panel" sin el ".html" en la barra de
+     direcciones (URL "linda"), así que el reemplazo tiene que aceptar
+     los dos casos o el link que se manda queda apuntando al panel mismo. */
+  return location.origin + location.pathname.replace(/panel(\.html)?$/, "index.html");
 }
 
 function clientesUnicos(estado) {
@@ -1246,13 +1354,13 @@ document.addEventListener("click", function (ev) {
       }, "Sí, cancelar");
       break;
     case "cobrar":
-      marcarCobrado(id);
+      confirmarCobroConCuidado(id, function () { marcarCobrado(id); });
       break;
     case "retirado":
       marcarRetirado(id, false);
       break;
     case "retirado-cobrado":
-      marcarRetirado(id, true);
+      confirmarCobroConCuidado(id, function () { marcarRetirado(id, true); });
       break;
     case "limpiar-filtro":
       filtroVentas = { texto: "", periodo: "todo" };
@@ -1377,6 +1485,17 @@ document.addEventListener("click", function (ev) {
     }
     case "registrar-gasto":
       abrirRegistrarGasto();
+      break;
+    case "abrir-caja":
+      abrirModalAbrirCaja();
+      break;
+    case "cerrar-caja":
+      abrirModalCerrarCaja(calcularEsperadoEfectivoHoy(storageService.leer()));
+      break;
+    case "reabrir-caja":
+      pedirConfirmacion("Reabrir caja", "Se borra el conteo de cierre de hoy para que puedas corregirlo.", function () {
+        reabrirCajaDelDia(hoyYmd()); return true;
+      }, "Sí, reabrir");
       break;
     case "restablecer":
       pedirConfirmacion("Restablecer demo",

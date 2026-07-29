@@ -355,19 +355,30 @@ function confirmarPedidoCliente() {
 let mapaLeaflet = null;
 let marcadorLeaflet = null;
 let autoUbicacionIntentada = false;
+let ultimoZoomMapa = MAPA_CENTRO.zoom;
 
 function iniciarMapa() {
   const el = document.getElementById("mapa-ubicacion");
   if (!el || typeof L === "undefined") return;
   destruirMapa();
   const centro = borrador.gps || MAPA_CENTRO;
-  mapaLeaflet = L.map(el, { attributionControl: false }).setView([centro.lat, centro.lng], MAPA_CENTRO.zoom);
+  mapaLeaflet = L.map(el, { attributionControl: false }).setView([centro.lat, centro.lng], ultimoZoomMapa);
   /* Imagen satelital (Esri, gratis y sin API key): en pueblos sin nombres de
      calle es mucho más útil que un mapa de rutas, porque se ve la casa. */
   L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
     maxZoom: 19,
     attribution: "Esri"
   }).addTo(mapaLeaflet);
+  /* Encima de la foto, los nombres de calles, plazas y lugares (capa
+     transparente, también gratis de Esri). Sin esto la foto sola no dice
+     dónde está parado uno. */
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 19,
+    attribution: "Esri"
+  }).addTo(mapaLeaflet);
+  /* Recordamos el zoom para no perderlo cada vez que el marcador se mueve
+     y el mapa se vuelve a armar (si no, cada toque "alejaba" la vista). */
+  mapaLeaflet.on("zoomend", function () { ultimoZoomMapa = mapaLeaflet.getZoom(); });
   marcadorLeaflet = L.marker([centro.lat, centro.lng], { draggable: true }).addTo(mapaLeaflet);
   marcadorLeaflet.on("dragend", guardarPosicionMarcador);
   mapaLeaflet.on("click", function (ev) {
